@@ -146,7 +146,7 @@ func (a *Activity) Eval(ctx activity.Context) (bool, error) {
 	} else {
 
 		a.logger.Debug("Publishing data to STAN Channel...")
-		result["ackedNuid"], err = a.stanConn.PublishAsync(input.ChannelId, payloadBytes, func(ackedNuid string, err error) {
+		result["ackedNuid"], err = a.stanConn.PublishAsync(input.ChannelID, payloadBytes, func(ackedNuid string, err error) {
 			if err != nil {
 				a.logger.Errorf("STAN acknowledgement error: %v", err)
 			}

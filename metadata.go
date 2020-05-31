@@ -1,10 +1,13 @@
 package nats
 
 import (
-	"github.com/project-flogo/core/app/resolve"
+	"github.com/project-flogo/core/data/mapper"
+	"github.com/project-flogo/core/data/property"
+	"github.com/project-flogo/core/data/resolve"
 	"github.com/project-flogo/core/data/coerce"
 )
 
+// Settings struct
 type Settings struct {
 	ClusterUrls string                 `md:"clusterUrls,required"` // The NATS cluster to connect to
 	ConnName    string                 `md:"connName"`
@@ -15,6 +18,14 @@ type Settings struct {
 	DataType    string                 `md:"dataType"`  // Data type
 }
 
+var resolver = resolve.NewCompositeResolver(map[string]resolve.Resolver{
+	".":        &resolve.ScopeResolver{},
+	"env":      &resolve.EnvResolver{},
+	"property": &property.Resolver{},
+	"loop":     &resolve.LoopResolver{},
+})
+
+// FromMap method of Settings
 func (s *Settings) FromMap(values map[string]interface{}) error {
 
 	var (
@@ -35,50 +46,97 @@ func (s *Settings) FromMap(values map[string]interface{}) error {
 		return err
 	}
 
+	mapperFactory := mapper.NewFactory(resolver)
+
 	if values["auth"] != nil {
-		s.Auth = make(map[string]interface{})
-		for k, v := range values["auth"].(map[string]interface{}) {
-			s.Auth[k], err = s.MapValue(v)
-			if err != nil {
-				return err
-			}
+		var authOptions map[string]interface{}
+		authOptions, err = coerce.ToObject(values["auth"])
+		if err != nil {
+			return err
 		}
+
+		var authMapper mapper.Mapper
+		authMapper, err = mapperFactory.NewMapper(authOptions)
+		if err != nil {
+			return err
+		}
+	
+		var authValue map[string]interface{}
+		authValue, err = authMapper.Apply(nil)
+		if err != nil {
+			return err
+		}
+		s.Auth = authValue
 	}
 
 	if values["reconnect"] != nil {
-		s.Reconnect = make(map[string]interface{})
-		for k, v := range values["reconnect"].(map[string]interface{}) {
-			s.Reconnect[k], err = s.MapValue(v)
-			if err != nil {
-				return err
-			}
+		var reconnectOptions map[string]interface{}
+		reconnectOptions, err = coerce.ToObject(values["reconnect"])
+		if err != nil {
+			return err
 		}
+
+		var reconnectMapper mapper.Mapper
+		reconnectMapper, err = mapperFactory.NewMapper(reconnectOptions)
+		if err != nil {
+			return err
+		}
+	
+		var reconnectValue map[string]interface{}
+		reconnectValue, err = reconnectMapper.Apply(nil)
+		if err != nil {
+			return err
+		}
+		s.Reconnect = reconnectValue
 	}
 
 	if values["sslConfig"] != nil {
-		s.SslConfig = make(map[string]interface{})
-		for k, v := range values["sslConfig"].(map[string]interface{}) {
-			s.SslConfig[k], err = s.MapValue(v)
-			if err != nil {
-				return err
-			}
+		var sslConfigOptions map[string]interface{}
+		sslConfigOptions, err = coerce.ToObject(values["sslConfig"])
+		if err != nil {
+			return err
 		}
+
+		var sslConfigMapper mapper.Mapper
+		sslConfigMapper, err = mapperFactory.NewMapper(sslConfigOptions)
+		if err != nil {
+			return err
+		}
+	
+		var sslConfigValue map[string]interface{}
+		sslConfigValue, err = sslConfigMapper.Apply(nil)
+		if err != nil {
+			return err
+		}
+		s.SslConfig = sslConfigValue
 	}
 
 	if values["streaming"] != nil {
-		s.Streaming = make(map[string]interface{})
-		for k, v := range values["streaming"].(map[string]interface{}) {
-			s.Streaming[k], err = s.MapValue(v)
-			if err != nil {
-				return err
-			}
+		var streamingOptions map[string]interface{}
+		streamingOptions, err = coerce.ToObject(values["streaming"])
+		if err != nil {
+			return err
 		}
+		
+		var streamingMapper mapper.Mapper
+		streamingMapper, err = mapperFactory.NewMapper(streamingOptions)
+		if err != nil {
+			return err
+		}
+	
+		var streamingValue map[string]interface{}
+		streamingValue, err = streamingMapper.Apply(nil)
+		if err != nil {
+			return err
+		}
+		s.Streaming = streamingValue
 	}
 
 	return nil
 
 }
 
+// ToMap method of Settings
 func (s *Settings) ToMap() map[string]interface{} {
 
 	return map[string]interface{}{
@@ -93,53 +151,15 @@ func (s *Settings) ToMap() map[string]interface{} {
 
 }
 
-func (s *Settings) MapValue(value interface{}) (interface{}, error) {
-	var (
-		err      error
-		anyValue interface{}
-	)
-
-	switch val := value.(type) {
-	case string:
-		if len(val) > 0 && val[0] == '=' {
-			anyValue, err = resolve.Resolve(val[1:], nil)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			anyValue, err = coerce.ToAny(val)
-			if err != nil {
-				return nil, err
-			}
-		}
-		
-	case map[string]interface{}:
-		dataMap := make(map[string]interface{})
-		for k, v := range val {
-			dataMap[k], err = s.MapValue(v)
-			if err != nil {
-				return nil, err
-			}
-		}
-		anyValue = dataMap
-
-	default:
-		anyValue, err = coerce.ToAny(val)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return anyValue, nil
-}
-
+// Input struct
 type Input struct {
 	Subject   string `md:"subject,required"`
-	ChannelId string `md:"channelId"`
+	ChannelID string `md:"channelId"`
 	Data      string `md:"data,required"`
 	ReceivedTimestamp float64 `md:"receivedTimestmap"`
 }
 
+// FromMap method of Input
 func (i *Input) FromMap(values map[string]interface{}) error {
 	var err error
 
@@ -148,7 +168,7 @@ func (i *Input) FromMap(values map[string]interface{}) error {
 		return err
 	}
 
-	i.ChannelId, err = coerce.ToString(values["channelId"])
+	i.ChannelID, err = coerce.ToString(values["channelId"])
 	if err != nil {
 		return err
 	}
@@ -168,10 +188,11 @@ func (i *Input) FromMap(values map[string]interface{}) error {
 	return nil
 }
 
+// ToMap method of Input
 func (i *Input) ToMap() map[string]interface{} {
 	dataMap := map[string]interface{}{
 		"subject":   i.Subject,
-		"channelId": i.ChannelId,
+		"channelId": i.ChannelID,
 		"data":      i.Data,
 	}
 	if i.ReceivedTimestamp > float64(0) {
@@ -180,17 +201,20 @@ func (i *Input) ToMap() map[string]interface{} {
 	return dataMap
 }
 
+// Output struct
 type Output struct {
 	Status string                 `md:"status,required"`
 	Result map[string]interface{} `md:"result"`
 }
 
+// FromMap method of Output
 func (o *Output) FromMap(values map[string]interface{}) error {
 	o.Status = values["status"].(string)
 	o.Result = values["result"].(map[string]interface{})
 	return nil
 }
 
+// ToMap method of Output
 func (o *Output) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"status": o.Status,
