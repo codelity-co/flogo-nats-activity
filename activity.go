@@ -10,17 +10,27 @@ import (
 	"time"
 
 	"github.com/project-flogo/core/activity"
+	"github.com/project-flogo/core/data"
+	"github.com/project-flogo/core/data/mapper"
+	"github.com/project-flogo/core/data/property"
+	"github.com/project-flogo/core/data/resolve"
 	"github.com/project-flogo/core/support/log"
 
 	nats "github.com/nats-io/nats.go"
 	stan "github.com/nats-io/stan.go"
 )
 
+var activityMd = activity.ToMetadata(&Settings{}, &Input{}, &Output{})
+var resolver = resolve.NewCompositeResolver(map[string]resolve.Resolver{
+	".":        &resolve.ScopeResolver{},
+	"env":      &resolve.EnvResolver{},
+	"property": &property.Resolver{},
+	"loop":     &resolve.LoopResolver{},
+})
+
 func init() {
 	_ = activity.Register(&Activity{}, New)
 }
-
-var activityMd = activity.ToMetadata(&Settings{}, &Input{}, &Output{})
 
 //New optional factory method, should be used if one activity instance per configuration is desired
 func New(ctx activity.InitContext) (activity.Activity, error) {
@@ -44,6 +54,50 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 	logger.Debug("Mapped Settings struct successfully")
 
 	logger.Debugf("From Map Setting: %v", s)
+
+	// Resolving auth settings
+	if s.Auth != nil {
+		ctx.Logger().Debugf("methodOpitons settings being resolved: %v", s.Auth)
+		auth, err := resolveObject(s.Auth)
+		if err != nil {
+			return nil, err
+		}
+		s.Auth = auth
+		ctx.Logger().Debugf("auth settings resolved: %v", s.Auth)
+	}
+
+	// Resolving reconnect settings
+	if s.Reconnect != nil {
+		ctx.Logger().Debugf("reconnect settings being resolved: %v", s.Reconnect)
+		reconnect, err := resolveObject(s.Reconnect)
+		if err != nil {
+			return nil, err
+		}
+		s.Reconnect = reconnect
+		ctx.Logger().Debugf("reconnect settings resolved: %v", s.Reconnect)
+	}
+
+	// Resolving sslConfig settings
+	if s.SslConfig != nil {
+		ctx.Logger().Debugf("sslConfig settings being resolved: %v", s.SslConfig)
+		sslConfig, err := resolveObject(s.SslConfig)
+		if err != nil {
+			return nil, err
+		}
+		s.SslConfig = sslConfig
+		ctx.Logger().Debugf("sslConfig settings resolved: %v", s.SslConfig)
+	}
+
+	// Resolving sslConfig settings
+	if s.Streaming != nil {
+		ctx.Logger().Debugf("streaming settings being resolved: %v", s.Streaming)
+		streaming, err := resolveObject(s.Streaming)
+		if err != nil {
+			return nil, err
+		}
+		s.Streaming = streaming
+		ctx.Logger().Debugf("streaming settings resolved: %v", s.Streaming)
+	}
 
 	logger.Debug("Getting NATS connection...")
 	nc, err = getNatsConnection(logger, s)
@@ -121,10 +175,10 @@ func (a *Activity) Eval(ctx activity.Context) (bool, error) {
 	a.logger.Debugf("Input: %v", input)
 
 	payload := map[string]interface{}{
-		"subject": input.Subject,
-		"message": input.Data,
-		"receivedTimestamp": input.ReceivedTimestamp,
-		"streamingTimestamp": float64(time.Now().UTC().UnixNano())/float64(1000000),
+		"subject":            input.Subject,
+		"message":            input.Data,
+		"receivedTimestamp":  input.ReceivedTimestamp,
+		"streamingTimestamp": float64(time.Now().UTC().UnixNano()) / float64(1000000),
 	}
 	var payloadBytes []byte
 	payloadBytes, err = json.Marshal(payload)
@@ -349,29 +403,30 @@ func getNatsConnSslConfigOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 	// Check sslConfig setting
 	logger.Debugf("settings.SslConfig: %v", settings.SslConfig)
 	if settings.SslConfig != nil && len(settings.SslConfig) > 0 {
+		if settings.SslConfig["enabled"].(bool) {
+			// Skip verify
+			if skipVerify, ok := settings.SslConfig["skipVerify"]; ok {
+				opts = append(opts, nats.Secure(&tls.Config{
+					InsecureSkipVerify: skipVerify.(bool),
+				}))
+			}
 
-		// Skip verify
-		if skipVerify, ok := settings.SslConfig["skipVerify"]; ok {
-			opts = append(opts, nats.Secure(&tls.Config{
-				InsecureSkipVerify: skipVerify.(bool),
-			}))
-		}
-
-		// CA Root
-		if caFile, ok := settings.SslConfig["caFile"]; ok {
-			opts = append(opts, nats.RootCAs(caFile.(string)))
-			// Cert file
-			if certFile, ok := settings.SslConfig["certFile"]; ok {
-				if keyFile, ok := settings.SslConfig["keyFile"]; ok {
-					opts = append(opts, nats.ClientCert(certFile.(string), keyFile.(string)))
+			// CA Root
+			if caFile, ok := settings.SslConfig["caFile"]; ok {
+				opts = append(opts, nats.RootCAs(caFile.(string)))
+				// Cert file
+				if certFile, ok := settings.SslConfig["certFile"]; ok {
+					if keyFile, ok := settings.SslConfig["keyFile"]; ok {
+						opts = append(opts, nats.ClientCert(certFile.(string), keyFile.(string)))
+					} else {
+						return nil, fmt.Errorf("Missing keyFile setting")
+					}
 				} else {
-					return nil, fmt.Errorf("Missing keyFile setting")
+					return nil, fmt.Errorf("Missing certFile setting")
 				}
 			} else {
-				return nil, fmt.Errorf("Missing certFile setting")
+				return nil, fmt.Errorf("Missing caFile setting")
 			}
-		} else {
-			return nil, fmt.Errorf("Missing caFile setting")
 		}
 
 	}
@@ -409,4 +464,21 @@ func getStanConnection(logger log.Logger, mapping map[string]interface{}, conn *
 	}
 
 	return sc, nil
+}
+
+func resolveObject(object map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+
+	mapperFactory := mapper.NewFactory(resolver)
+	valuesMapper, err := mapperFactory.NewMapper(object)
+	if err != nil {
+		return nil, err
+	}
+
+	objectValues, err := valuesMapper.Apply(data.NewSimpleScope(map[string]interface{}{}, nil))
+	if err != nil {
+		return nil, err
+	}
+
+	return objectValues, nil
 }
