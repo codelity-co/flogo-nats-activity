@@ -57,7 +57,7 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 
 	// Resolving auth settings
 	if s.Auth != nil {
-		ctx.Logger().Debugf("methodOpitons settings being resolved: %v", s.Auth)
+		ctx.Logger().Debugf("auth settings being resolved: %v", s.Auth)
 		auth, err := resolveObject(s.Auth)
 		if err != nil {
 			return nil, err
