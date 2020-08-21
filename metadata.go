@@ -1,9 +1,6 @@
 package nats
 
 import (
-	"github.com/project-flogo/core/data/mapper"
-	"github.com/project-flogo/core/data/property"
-	"github.com/project-flogo/core/data/resolve"
 	"github.com/project-flogo/core/data/coerce"
 )
 
@@ -17,13 +14,6 @@ type Settings struct {
 	Streaming   map[string]interface{} `md:"streaming"` // NATS streaming config
 	DataType    string                 `md:"dataType"`  // Data type
 }
-
-var resolver = resolve.NewCompositeResolver(map[string]resolve.Resolver{
-	".":        &resolve.ScopeResolver{},
-	"env":      &resolve.EnvResolver{},
-	"property": &property.Resolver{},
-	"loop":     &resolve.LoopResolver{},
-})
 
 // FromMap method of Settings
 func (s *Settings) FromMap(values map[string]interface{}) error {
