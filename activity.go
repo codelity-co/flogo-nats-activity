@@ -370,7 +370,7 @@ func getNatsConnReconnectOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 
 		// Max reconnect attempts
 		if maxReconnects, ok := settings.Reconnect["maxReconnects"]; ok {
-			opts = append(opts, nats.MaxReconnects(maxReconnects.(int64)))
+			opts = append(opts, nats.MaxReconnects(int(maxReconnects.(int64))))
 		}
 
 		// Don't randomize
@@ -391,7 +391,7 @@ func getNatsConnReconnectOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 
 		// Reconnect buffer size in bytes
 		if reconnectBufSize, ok := settings.Reconnect["reconnectBufSize"]; ok {
-			opts = append(opts, nats.ReconnectBufSize(reconnectBufSize.(int64)))
+			opts = append(opts, nats.ReconnectBufSize(int(reconnectBufSize.(int64))))
 		}
 	}
 	return opts, nil
