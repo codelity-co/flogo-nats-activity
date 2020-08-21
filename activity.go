@@ -403,31 +403,30 @@ func getNatsConnSslConfigOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 	// Check sslConfig setting
 	logger.Debugf("settings.SslConfig: %v", settings.SslConfig)
 	if settings.SslConfig != nil && len(settings.SslConfig) > 0 {
-		if settings.SslConfig["enabled"].(bool) {
-			// Skip verify
-			if skipVerify, ok := settings.SslConfig["skipVerify"]; ok {
-				opts = append(opts, nats.Secure(&tls.Config{
-					InsecureSkipVerify: skipVerify.(bool),
-				}))
-			}
+		// Skip verify
+		if skipVerify, ok := settings.SslConfig["skipVerify"]; ok {
+			opts = append(opts, nats.Secure(&tls.Config{
+				InsecureSkipVerify: skipVerify.(bool),
+			}))
+		}
 
-			// CA Root
-			if caFile, ok := settings.SslConfig["caFile"]; ok {
-				opts = append(opts, nats.RootCAs(caFile.(string)))
-				// Cert file
-				if certFile, ok := settings.SslConfig["certFile"]; ok {
-					if keyFile, ok := settings.SslConfig["keyFile"]; ok {
-						opts = append(opts, nats.ClientCert(certFile.(string), keyFile.(string)))
-					} else {
-						return nil, fmt.Errorf("Missing keyFile setting")
-					}
+		// CA Root
+		if caFile, ok := settings.SslConfig["caFile"]; ok {
+			opts = append(opts, nats.RootCAs(caFile.(string)))
+			// Cert file
+			if certFile, ok := settings.SslConfig["certFile"]; ok {
+				if keyFile, ok := settings.SslConfig["keyFile"]; ok {
+					opts = append(opts, nats.ClientCert(certFile.(string), keyFile.(string)))
 				} else {
-					return nil, fmt.Errorf("Missing certFile setting")
+					return nil, fmt.Errorf("Missing keyFile setting")
 				}
 			} else {
-				return nil, fmt.Errorf("Missing caFile setting")
+				return nil, fmt.Errorf("Missing certFile setting")
 			}
+		} else {
+			return nil, fmt.Errorf("Missing caFile setting")
 		}
+		
 
 	}
 	return opts, nil
