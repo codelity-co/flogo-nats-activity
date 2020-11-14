@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/project-flogo/core/activity"
-	"github.com/project-flogo/core/data"
-	"github.com/project-flogo/core/data/mapper"
-	"github.com/project-flogo/core/data/property"
-	"github.com/project-flogo/core/data/resolve"
+	// "github.com/project-flogo/core/data"
+	// "github.com/project-flogo/core/data/mapper"
+	// "github.com/project-flogo/core/data/property"
+	// "github.com/project-flogo/core/data/resolve"
 	"github.com/project-flogo/core/support/log"
 
 	nats "github.com/nats-io/nats.go"
@@ -21,12 +21,12 @@ import (
 )
 
 var activityMd = activity.ToMetadata(&Settings{}, &Input{}, &Output{})
-var resolver = resolve.NewCompositeResolver(map[string]resolve.Resolver{
-	".":        &resolve.ScopeResolver{},
-	"env":      &resolve.EnvResolver{},
-	"property": &property.Resolver{},
-	"loop":     &resolve.LoopResolver{},
-})
+// var resolver = resolve.NewCompositeResolver(map[string]resolve.Resolver{
+// 	".":        &resolve.ScopeResolver{},
+// 	"env":      &resolve.EnvResolver{},
+// 	"property": &property.Resolver{},
+// 	"loop":     &resolve.LoopResolver{},
+// })
 
 func init() {
 	_ = activity.Register(&Activity{}, New)
@@ -56,48 +56,48 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 	logger.Debugf("From Map Setting: %v", s)
 
 	// Resolving auth settings
-	if s.Auth != nil {
-		ctx.Logger().Debugf("auth settings being resolved: %v", s.Auth)
-		auth, err := resolveObject(s.Auth)
-		if err != nil {
-			return nil, err
-		}
-		s.Auth = auth
-		ctx.Logger().Debugf("auth settings resolved: %v", s.Auth)
-	}
+	// if s.Auth != nil {
+	// 	ctx.Logger().Debugf("auth settings being resolved: %v", s.Auth)
+	// 	auth, err := resolveObject(s.Auth)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	s.Auth = auth
+	// 	ctx.Logger().Debugf("auth settings resolved: %v", s.Auth)
+	// }
 
 	// Resolving reconnect settings
-	if s.Reconnect != nil {
-		ctx.Logger().Debugf("reconnect settings being resolved: %v", s.Reconnect)
-		reconnect, err := resolveObject(s.Reconnect)
-		if err != nil {
-			return nil, err
-		}
-		s.Reconnect = reconnect
-		ctx.Logger().Debugf("reconnect settings resolved: %v", s.Reconnect)
-	}
+	// if s.Reconnect != nil {
+	// 	ctx.Logger().Debugf("reconnect settings being resolved: %v", s.Reconnect)
+	// 	reconnect, err := resolveObject(s.Reconnect)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	s.Reconnect = reconnect
+	// 	ctx.Logger().Debugf("reconnect settings resolved: %v", s.Reconnect)
+	// }
 
 	// Resolving sslConfig settings
-	if s.SslConfig != nil {
-		ctx.Logger().Debugf("sslConfig settings being resolved: %v", s.SslConfig)
-		sslConfig, err := resolveObject(s.SslConfig)
-		if err != nil {
-			return nil, err
-		}
-		s.SslConfig = sslConfig
-		ctx.Logger().Debugf("sslConfig settings resolved: %v", s.SslConfig)
-	}
+	// if s.SslConfig != nil {
+	// 	ctx.Logger().Debugf("sslConfig settings being resolved: %v", s.SslConfig)
+	// 	sslConfig, err := resolveObject(s.SslConfig)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	s.SslConfig = sslConfig
+	// 	ctx.Logger().Debugf("sslConfig settings resolved: %v", s.SslConfig)
+	// }
 
-	// Resolving sslConfig settings
-	if s.Streaming != nil {
-		ctx.Logger().Debugf("streaming settings being resolved: %v", s.Streaming)
-		streaming, err := resolveObject(s.Streaming)
-		if err != nil {
-			return nil, err
-		}
-		s.Streaming = streaming
-		ctx.Logger().Debugf("streaming settings resolved: %v", s.Streaming)
-	}
+	// Resolving streaming settings
+	// if s.Streaming != nil {
+	// 	ctx.Logger().Debugf("streaming settings being resolved: %v", s.Streaming)
+	// 	streaming, err := resolveObject(s.Streaming)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	s.Streaming = streaming
+	// 	ctx.Logger().Debugf("streaming settings resolved: %v", s.Streaming)
+	// }
 
 	logger.Debug("Getting NATS connection...")
 	nc, err = getNatsConnection(logger, s)
@@ -112,25 +112,21 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		activitySettings: s,
 		logger:           logger,
 		natsConn:         nc,
-		natsStreaming:    false,
 	}
 	logger.Debug("Created Activity struct successfully")
 
-	logger.Debugf("Streaming: %v", s.Streaming)
+	logger.Debugf("Enable Streaming: %v", s.EnableStreaming)
+	logger.Debugf("Stan Cluster ID: %v", s.StanClusterID)
 
-	if enableStreaming, ok := s.Streaming["enableStreaming"]; ok {
-		logger.Debug("Enabling NATS streaming...")
-		act.natsStreaming = enableStreaming.(bool)
-		if act.natsStreaming {
-			logger.Debug("Getting STAN connection...")
-			act.stanConn, err = getStanConnection(logger, s.Streaming, nc)
-			if err != nil {
-				logger.Errorf("STAN connection error: %v", err)
-				return nil, err
-			}
-			logger.Debug("Got STAN connection")
+	if s.EnableStreaming {
+		logger.Debug("Getting STAN connection...")
+		act.stanConn, err = getStanConnection(logger, nc, s.StanClusterID)
+		if err != nil {
+			logger.Errorf("STAN connection error: %v", err)
+			return nil, err
 		}
-		logger.Debug("Enabled NATS streaming successfully")
+		logger.Debug("Got STAN connection")
+
 	}
 
 	logger.Debug("Finished New method of activity")
@@ -252,7 +248,7 @@ func getNatsConnection(logger log.Logger, settings *Settings) (*nats.Conn, error
 	}
 	logger.Debug("Checked")
 
-	urlString = settings.ClusterUrls
+	urlString = settings.NatsClusterUrls
 
 	logger.Debug("Getting NATS connection auth settings...")
 	authOpts, err = getNatsConnAuthOpts(logger, settings)
@@ -282,8 +278,8 @@ func getNatsConnection(logger log.Logger, settings *Settings) (*nats.Conn, error
 	natsOptions = append(natsOptions, sslConfigOpts...)
 
 	// Check ConnName
-	if len(settings.ConnName) > 0 {
-		natsOptions = append(natsOptions, nats.Name(settings.ConnName))
+	if len(settings.NatsConnName) > 0 {
+		natsOptions = append(natsOptions, nats.Name(settings.NatsConnName))
 	}
 
 	return nats.Connect(urlString, natsOptions...)
@@ -293,10 +289,10 @@ func getNatsConnection(logger log.Logger, settings *Settings) (*nats.Conn, error
 // checkClusterUrls is function to all valid NATS cluster urls
 func checkClusterUrls(logger log.Logger, settings *Settings) error {
 	// Check ClusterUrls
-	clusterUrls := strings.Split(settings.ClusterUrls, ",")
+	clusterUrls := strings.Split(settings.NatsClusterUrls, ",")
 	logger.Debugf("clusterUrls: %v", clusterUrls)
 	if len(clusterUrls) < 1 {
-		return fmt.Errorf("ClusterUrl [%v] is invalid, require at least one url", settings.ClusterUrls)
+		return fmt.Errorf("ClusterUrl [%v] is invalid, require at least one url", settings.NatsClusterUrls)
 	}
 	for _, v := range clusterUrls {
 		logger.Debugf("v: %v", v)
@@ -330,69 +326,59 @@ func validateClusterURL(url string) error {
 func getNatsConnAuthOpts(logger log.Logger, settings *Settings) ([]nats.Option, error) {
 	opts := make([]nats.Option, 0)
 	// Check auth setting
-	logger.Debugf("settings.Auth: %v", settings.Auth)
-	if settings.Auth != nil && len(settings.Auth) > 0 {
-		if username, ok := settings.Auth["username"]; ok { // Check if usename is defined
-			password, ok := settings.Auth["password"] // check if password is defined
-			if !ok {
-				return nil, fmt.Errorf("Missing password")
-			} else {
-				// Create UserInfo NATS option
-				opts = append(opts, nats.UserInfo(username.(string), password.(string)))
-			}
-		} else if token, ok := settings.Auth["token"]; ok { // Check if token is defined
-			opts = append(opts, nats.Token(token.(string)))
-		} else if nkeySeedfile, ok := settings.Auth["nkeySeedfile"]; ok { // Check if nkey seed file is defined
-			nkey, err := nats.NkeyOptionFromSeed(nkeySeedfile.(string))
-			if err != nil {
-				return nil, err
-			}
-			opts = append(opts, nkey)
-		} else if credfile, ok := settings.Auth["credfile"]; ok { // Check if credential file is defined
-			opts = append(opts, nats.UserCredentials(credfile.(string)))
+
+	if settings.NatsUserName != "" { // Check if usename is defined
+	  // check if password is defined
+		if settings.NatsUserPassword == "" {
+			return nil, fmt.Errorf("Missing password")
+		} else {
+			// Create UserInfo NATS option
+			opts = append(opts, nats.UserInfo(settings.NatsUserName, settings.NatsUserPassword))
 		}
+	} else if settings.NatsToken != "" { // Check if token is defined
+		opts = append(opts, nats.Token(settings.NatsToken))
+	} else if settings.NatsNkeySeedfile != "" { // Check if nkey seed file is defined
+		nkey, err := nats.NkeyOptionFromSeed(settings.NatsNkeySeedfile)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, nkey)
+	} else if settings.NatsCredentialFile != "" { // Check if credential file is defined
+		opts = append(opts, nats.UserCredentials(settings.NatsCredentialFile))
 	}
 	return opts, nil
 }
 
 func getNatsConnReconnectOpts(logger log.Logger, settings *Settings) ([]nats.Option, error) {
 	opts := make([]nats.Option, 0)
-	// Check reconnect setting
-	logger.Debugf("settings.Reconnect: %v", settings.Reconnect)
-	if settings.Reconnect != nil && len(settings.Reconnect) > 0 {
 
-		// Enable autoReconnect
-		if autoReconnect, ok := settings.Reconnect["autoReconnect"]; ok {
-			if !autoReconnect.(bool) {
-				opts = append(opts, nats.NoReconnect())
-			}
-		}
+	// Enable autoReconnect
+	if !settings.AutoReconnect {
+		opts = append(opts, nats.NoReconnect())
+	}
+	
+	// Max reconnect attempts
+	if settings.MaxReconnects > 0 {
+		opts = append(opts, nats.MaxReconnects(settings.MaxReconnects))
+	}
 
-		// Max reconnect attempts
-		if maxReconnects, ok := settings.Reconnect["maxReconnects"]; ok {
-			opts = append(opts, nats.MaxReconnects(int(maxReconnects.(int64))))
-		}
+	// Don't randomize
+	if settings.EnableRandomReconnection {
+		opts = append(opts, nats.DontRandomize())
+	}
 
-		// Don't randomize
-		if dontRandomize, ok := settings.Reconnect["dontRandomize"]; ok {
-			if dontRandomize.(bool) {
-				opts = append(opts, nats.DontRandomize())
-			}
+	// Reconnect wait in seconds
+	if settings.ReconnectWait > 0 {
+		duration, err := time.ParseDuration(fmt.Sprintf("%vs", settings.ReconnectWait))
+		if err != nil {
+			return nil, err
 		}
+		opts = append(opts, nats.ReconnectWait(duration))
+	}
 
-		// Reconnect wait in seconds
-		if reconnectWait, ok := settings.Reconnect["reconnectWait"]; ok {
-			duration, err := time.ParseDuration(fmt.Sprintf("%vs", reconnectWait))
-			if err != nil {
-				return nil, err
-			}
-			opts = append(opts, nats.ReconnectWait(duration))
-		}
-
-		// Reconnect buffer size in bytes
-		if reconnectBufSize, ok := settings.Reconnect["reconnectBufSize"]; ok {
-			opts = append(opts, nats.ReconnectBufSize(int(reconnectBufSize.(int64))))
-		}
+	// Reconnect buffer size in bytes
+	if settings.ReconnectBufferSize > 0 {
+		opts = append(opts, nats.ReconnectBufSize(settings.ReconnectBufferSize))
 	}
 	return opts, nil
 }
@@ -400,23 +386,20 @@ func getNatsConnReconnectOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 func getNatsConnSslConfigOpts(logger log.Logger, settings *Settings) ([]nats.Option, error) {
 	opts := make([]nats.Option, 0)
 
-	// Check sslConfig setting
-	logger.Debugf("settings.SslConfig: %v", settings.SslConfig)
-	if settings.SslConfig != nil && len(settings.SslConfig) > 0 {
+	if settings.CertFile != "" && settings.KeyFile != "" {
 		// Skip verify
-		if skipVerify, ok := settings.SslConfig["skipVerify"]; ok {
+		if settings.SkipVerify {
 			opts = append(opts, nats.Secure(&tls.Config{
-				InsecureSkipVerify: skipVerify.(bool),
+				InsecureSkipVerify: settings.SkipVerify,
 			}))
 		}
-
 		// CA Root
-		if caFile, ok := settings.SslConfig["caFile"]; ok {
-			opts = append(opts, nats.RootCAs(caFile.(string)))
+		if settings.CaFile != "" {
+			opts = append(opts, nats.RootCAs(settings.CaFile))
 			// Cert file
-			if certFile, ok := settings.SslConfig["certFile"]; ok {
-				if keyFile, ok := settings.SslConfig["keyFile"]; ok {
-					opts = append(opts, nats.ClientCert(certFile.(string), keyFile.(string)))
+			if settings.CertFile != "" {
+				if settings.KeyFile != "" {
+					opts = append(opts, nats.ClientCert(settings.CertFile, settings.KeyFile))
 				} else {
 					return nil, fmt.Errorf("Missing keyFile setting")
 				}
@@ -426,29 +409,18 @@ func getNatsConnSslConfigOpts(logger log.Logger, settings *Settings) ([]nats.Opt
 		} else {
 			return nil, fmt.Errorf("Missing caFile setting")
 		}
-		
-
 	}
 	return opts, nil
 }
 
-func getStanConnection(logger log.Logger, mapping map[string]interface{}, conn *nats.Conn) (stan.Conn, error) {
+func getStanConnection(logger log.Logger, conn *nats.Conn, stanClusterID string) (stan.Conn, error) {
 
-	var (
-		err       error
-		clusterID string
-		ok        bool
-		hostname  string
-		sc        stan.Conn
-	)
-
-	if _, ok = mapping["clusterId"]; !ok {
-		return nil, fmt.Errorf("clusterId not found")
+	if stanClusterID == "" {
+		return nil, fmt.Errorf("missing stanClusterId")
 	}
 
-	clusterID = mapping["clusterId"].(string)
-	logger.Debugf("clusterID: %v", clusterID)
-	hostname, err = os.Hostname()
+	logger.Debugf("clusterID: %v", stanClusterID)
+	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +429,7 @@ func getStanConnection(logger log.Logger, mapping map[string]interface{}, conn *
 	logger.Debugf("hostname: %v", hostname)
 	logger.Debugf("natsConn: %v", conn)
 
-	sc, err = stan.Connect(clusterID, hostname, stan.NatsConn(conn))
+	sc, err := stan.Connect(stanClusterID, hostname, stan.NatsConn(conn))
 	if err != nil {
 		return nil, err
 	}
@@ -465,19 +437,19 @@ func getStanConnection(logger log.Logger, mapping map[string]interface{}, conn *
 	return sc, nil
 }
 
-func resolveObject(object map[string]interface{}) (map[string]interface{}, error) {
-	var err error
+// func resolveObject(object map[string]interface{}) (map[string]interface{}, error) {
+// 	var err error
 
-	mapperFactory := mapper.NewFactory(resolver)
-	valuesMapper, err := mapperFactory.NewMapper(object)
-	if err != nil {
-		return nil, err
-	}
+// 	// mapperFactory := mapper.NewFactory(resolver)
+// 	// valuesMapper, err := mapperFactory.NewMapper(object)
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
 
-	objectValues, err := valuesMapper.Apply(data.NewSimpleScope(map[string]interface{}{}, nil))
-	if err != nil {
-		return nil, err
-	}
+// 	// objectValues, err := valuesMapper.Apply(data.NewSimpleScope(map[string]interface{}{}, nil))
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
 
-	return objectValues, nil
-}
+// 	return objectValues, nil
+// }

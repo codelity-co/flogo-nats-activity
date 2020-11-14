@@ -60,8 +60,8 @@ func (suite *NatsActivityTestSuite) TestNatsActivity_Publish() {
 	t := suite.T()
 
 	settings := &Settings{
-		ClusterUrls: "nats://localhost:4222",
-		DataType:    "string",
+		NatsClusterUrls: "nats://localhost:4222",
+		PayloadFormat:    "JSON",
 	}
 	iCtx := test.NewActivityInitContext(settings, nil)
 	act, err := New(iCtx)
