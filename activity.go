@@ -171,9 +171,9 @@ func (a *Activity) Eval(ctx activity.Context) (bool, error) {
 	a.logger.Debugf("Input: %v", input)
 
 	payload := map[string]interface{}{
-		"subject":            input.Subject,
-		"message":            input.Data,
-		"receivedTimestamp":  input.ReceivedTimestamp,
+		"subject": input.Subject,
+		"data": input.Data,
+		"receivedTimestamp": input.ReceivedTimestamp,
 		"streamingTimestamp": float64(time.Now().UTC().UnixNano()) / float64(1000000),
 	}
 	var payloadBytes []byte
